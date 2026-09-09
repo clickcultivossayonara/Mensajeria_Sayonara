@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mensajería</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --paper: #f6f5f0; --surface: #ffffff; --ink: #1d2420; --ink-soft: #57625b; --ink-faint: #8a9089;
+    --line: #dbdfd4; --line-strong: #c4cabb; --accent: #2e6b4e; --accent-ink: #ffffff;
+    --accent-soft: #e3eee6; --accent-soft-line: #c3ddca; --warn: #b3742f; --warn-soft: #f6e9d7;
+    --critical: #a23d3d; --critical-soft: #f6e0e0;
+    --shadow: 0 1px 2px rgba(29, 36, 32, 0.06), 0 4px 16px rgba(29, 36, 32, 0.05);
+    --radius: 10px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #14180f; --surface: #1b211a; --ink: #eaf0e6; --ink-soft: #a8b3a3; --ink-faint: #6c766a;
+      --line: #2c332a; --line-strong: #3b453a; --accent: #6fbf8f; --accent-ink: #0d1a10;
+      --accent-soft: #223229; --accent-soft-line: #35503d; --warn: #e0a75c; --warn-soft: #3a2f1a;
+      --critical: #e08080; --critical-soft: #3a2020;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 4px 20px rgba(0,0,0,0.35);
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font-family: "Archivo", "Helvetica Neue", Arial, sans-serif; -webkit-font-smoothing: antialiased; min-height: 100vh; }
+
+  .wrap { width: 100%; max-width: 1180px; margin: 0 auto; padding: 40px 20px 56px; display: flex; flex-direction: column; gap: 22px; }
+  .wrap-angosto { max-width: 720px; margin: 0 auto; width: 100%; }
+
+  .page-header { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; border-bottom: 2px solid var(--ink); padding-bottom: 16px; }
+  .page-header .page-brand { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-faint); }
+  .page-header h1 { font-family: "Fraunces", Georgia, serif; font-weight: 700; font-size: clamp(24px, 5vw, 32px); margin: 0; letter-spacing: 0.01em; text-transform: uppercase; }
+
+  .tabs { display: flex; gap: 8px; justify-content: center; }
+  .tab-btn {
+    font: inherit; font-size: 13.5px; font-weight: 600; padding: 9px 18px; border-radius: 20px;
+    border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink-soft); cursor: pointer;
+  }
+  .tab-btn.activo { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+
+  section.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 22px 24px; }
+  section.card[hidden] { display: none; }
+  h2 { font-family: "Fraunces", Georgia, serif; font-weight: 600; font-size: 19px; margin: 0 0 4px; }
+  .card-hint { font-size: 12.5px; color: var(--ink-soft); margin: 0 0 18px; }
+
+  .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field label { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-soft); font-weight: 600; }
+  .field label .req { color: var(--critical); }
+  .field input[type=text], .field input[type=date], .field input[type=email], .field input[type=password], .field select {
+    font: inherit; font-size: 14px; padding: 9px 10px; border: 1px solid var(--line-strong); border-radius: 7px;
+    background: var(--paper); color: var(--ink);
+  }
+  .field input:focus, .field select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+  .form-actions { display: flex; align-items: center; gap: 14px; margin-top: 18px; }
+  .btn-primary {
+    font: inherit; font-size: 14px; font-weight: 600; padding: 10px 22px; border-radius: 7px; border: none;
+    background: var(--accent); color: var(--accent-ink); cursor: pointer;
+  }
+  .btn-primary:hover { opacity: 0.92; }
+  .btn-primary:disabled { opacity: 0.5; cursor: wait; }
+  .form-msg { font-size: 13.5px; font-weight: 500; }
+  .form-msg.ok { color: var(--accent); }
+  .form-msg.error { color: var(--critical); }
+
+  .pin-gate { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 30px 10px; text-align: center; }
+  .pin-gate[hidden] { display: none; }
+  .pin-gate p { margin: 0; font-size: 13.5px; color: var(--ink-soft); max-width: 380px; }
+  .pin-gate input { font: inherit; font-size: 16px; letter-spacing: 0.1em; text-align: center; padding: 10px 14px; border: 1px solid var(--line-strong); border-radius: 7px; background: var(--paper); color: var(--ink); width: 180px; }
+  .pin-gate input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+  .filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; margin-bottom: 14px; }
+  .filters .field { min-width: 160px; }
+  .result-count { font-size: 12.5px; color: var(--ink-faint); margin-left: auto; align-self: center; white-space: nowrap; }
+  .clear-btn, .link-btn {
+    font: inherit; font-size: 13px; font-weight: 600; padding: 8px 14px;
+    border-radius: 7px; border: 1px solid var(--line-strong);
+    background: var(--surface); color: var(--ink-soft); cursor: pointer;
+  }
+  .clear-btn:hover, .link-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .link-btn.plain { border: none; background: none; padding: 0; text-decoration: underline; }
+
+  .empty-state { grid-column: 1 / -1; padding: 40px 20px; text-align: center; color: var(--ink-faint); font-size: 14px; }
+
+  .pedidos-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+  .pedido-card {
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow);
+    padding: 14px 16px; display: flex; flex-direction: column; gap: 10px;
+  }
+  .pedido-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .pedido-fecha { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 12px; color: var(--ink-soft); }
+  .pedido-solicita { font-family: "Fraunces", Georgia, serif; font-size: 16px; font-weight: 600; margin: 0; }
+  .pedido-datos { display: flex; flex-direction: column; gap: 6px; }
+  .pedido-dato { display: flex; gap: 8px; font-size: 13px; line-height: 1.35; }
+  .dato-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-soft); font-weight: 600; flex-shrink: 0; min-width: 68px; }
+  .dato-valor { color: var(--ink); word-break: break-word; }
+  .pedido-obs label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-soft); font-weight: 600; display: block; margin-bottom: 4px; }
+  .pedido-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 8px; border-top: 1px solid var(--line); }
+  .pedido-confirmar { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--ink-soft); cursor: pointer; }
+
+  .estado-pill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 20px; font-size: 11.5px; font-weight: 600; white-space: nowrap; }
+  .estado-pill.pendiente { background: var(--warn-soft); color: var(--warn); }
+  .estado-pill.realizado { background: var(--accent-soft); color: var(--accent); }
+  .chk-confirmar { width: 17px; height: 17px; accent-color: var(--accent); cursor: pointer; }
+  .obs-input {
+    font: inherit; font-size: 12.5px; padding: 6px 8px; border: 1px solid var(--line-strong); border-radius: 6px;
+    background: var(--paper); color: var(--ink); width: 100%;
+  }
+  .obs-input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .obs-guardado { font-size: 10.5px; color: var(--accent); }
+
+  .top-bar { display: flex; justify-content: flex-end; }
+
+  footer { font-size: 12px; color: var(--ink-faint); text-align: center; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="page-header">
+    <span class="page-brand">Cultivos Sayonara</span>
+    <h1>Mensajería</h1>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn activo" id="tab-solicitar" type="button">Solicitar Mensajería</button>
+    <button class="tab-btn" id="tab-confirmar" type="button">Confirmar Pedidos</button>
+  </div>
+
+  <section class="card wrap-angosto" id="card-solicitar">
+    <h2>Solicitar Mensajería</h2>
+    <p class="card-hint">Diligencia el envío o encargo que necesitas. Queda registrado para que mensajería lo confirme.</p>
+
+    <form id="form-solicitud">
+      <div class="form-grid">
+        <div class="field">
+          <label for="s-solicita">Solicita <span class="req">*</span></label>
+          <input type="text" id="s-solicita" placeholder="Tu nombre" required autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="s-destino">Destino <span class="req">*</span></label>
+          <select id="s-destino" required>
+            <option value="">Selecciona un destino…</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="s-direccion">Dirección <span class="req">*</span></label>
+          <input type="text" id="s-direccion" placeholder="Ej. Calle 10 # 5-23" required autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="s-fecha">Fecha indicada <span class="req">*</span></label>
+          <input type="date" id="s-fecha" required>
+        </div>
+        <div class="field">
+          <label for="s-contenido">Contenido del paquete</label>
+          <input type="text" id="s-contenido" placeholder="Ej. Disco duro, documentos…" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="s-email">Correo de contacto <span class="req">*</span></label>
+          <input type="email" id="s-email" placeholder="tucorreo@cultivossayonara.com.co" required>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="btn-primary" id="btn-solicitud">Enviar solicitud</button>
+        <span class="form-msg" id="msg-solicitud"></span>
+      </div>
+    </form>
+  </section>
+
+  <section class="card" id="card-confirmar" hidden>
+    <div id="pin-gate" class="pin-gate">
+      <h2>Confirmar Pedidos</h2>
+      <p>Esta sección es solo para el equipo de mensajería: muestra nombres, correos y destinos de todas las solicitudes. Ingresa el PIN para continuar.</p>
+      <input type="password" id="pin-input" placeholder="PIN" inputmode="numeric" autocomplete="off">
+      <button type="button" class="btn-primary" id="btn-pin">Ingresar</button>
+      <span class="form-msg error" id="msg-pin"></span>
+    </div>
+
+    <div id="confirmar-contenido" hidden>
+      <div class="top-bar">
+        <button type="button" class="link-btn" id="btn-salir-pin">Salir de confirmación</button>
+      </div>
+      <h2>Confirmar Pedidos</h2>
+      <p class="card-hint">Marca cada pedido cuando ya haya sido entregado o gestionado.</p>
+
+      <div class="filters">
+        <div class="field">
+          <label for="lc-buscar">Solicita o destino</label>
+          <input type="text" id="lc-buscar" placeholder="Ej. Bibiana o La Ceja…" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="lc-estado">Estado</label>
+          <select id="lc-estado">
+            <option value="todas">Todas</option>
+            <option value="pendiente" selected>Pendientes</option>
+            <option value="realizado">Realizado</option>
+          </select>
+        </div>
+        <button class="clear-btn" id="lc-limpiar">Limpiar filtros</button>
+        <span class="result-count" id="lc-count"></span>
+      </div>
+      <div class="pedidos-grid" id="lc-cards"></div>
+    </div>
+  </section>
+
+  <footer>Cultivos Sayonara &middot; datos guardados en vivo en Supabase</footer>
+</div>
+
+<script>
+const SUPABASE_URL = "https://kgtwqywbowhllxqdjegi.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtndHdxeXdib3dobGx4cWRqZWdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODczMzQ4NjUsImV4cCI6MjEwMjkxMDg2NX0.NsrxM2EdIDvnmCPWjiNR3pBpcMXgPy8bQwagMOYAHHQ";
+const PIN_STORAGE_KEY = "mensajeria-pin";
+
+// Lista controlada de destinos, para evitar que cada quien escriba el
+// nombre del municipio de una forma distinta. Ajusta esta lista si hace
+// falta un destino nuevo.
+const DESTINOS_CONOCIDOS = ["Bello", "El Carmen De Viboral", "Envigado", "La Ceja", "La Union", "Marinilla", "Medellin"];
+
+function restHeaders() {
+  return { apikey: SUPABASE_ANON_KEY, Authorization: "Bearer " + SUPABASE_ANON_KEY };
+}
+function fechaHoy() { return new Date().toISOString().slice(0, 10); }
+function idUnico() {
+  return (crypto.randomUUID ? crypto.randomUUID().replace(/-/g, "").slice(0, 8) : Date.now().toString(16).slice(-8));
+}
+function fmtFecha(iso) {
+  if (!iso) return "";
+  const [y, m, d] = iso.slice(0, 10).split("-");
+  return `${d}/${m}/${y}`;
+}
+function escHtml(s) {
+  return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+// ---------------- tabs ----------------
+const tabSolicitar = document.getElementById("tab-solicitar");
+const tabConfirmar = document.getElementById("tab-confirmar");
+const cardSolicitar = document.getElementById("card-solicitar");
+const cardConfirmar = document.getElementById("card-confirmar");
+tabSolicitar.addEventListener("click", () => {
+  tabSolicitar.classList.add("activo"); tabConfirmar.classList.remove("activo");
+  cardSolicitar.hidden = false; cardConfirmar.hidden = true;
+});
+tabConfirmar.addEventListener("click", () => {
+  tabConfirmar.classList.add("activo"); tabSolicitar.classList.remove("activo");
+  cardConfirmar.hidden = false; cardSolicitar.hidden = true;
+  intentarEntrarConPinGuardado();
+});
+
+// ---------------- formulario: solicitar mensajería (publico) ----------------
+const inSolicita = document.getElementById("s-solicita");
+const inDestino = document.getElementById("s-destino");
+const inDireccion = document.getElementById("s-direccion");
+const inFecha = document.getElementById("s-fecha");
+const inContenido = document.getElementById("s-contenido");
+const inEmail = document.getElementById("s-email");
+const formSolicitud = document.getElementById("form-solicitud");
+const btnSolicitud = document.getElementById("btn-solicitud");
+const msgSolicitud = document.getElementById("msg-solicitud");
+
+inFecha.value = fechaHoy();
+DESTINOS_CONOCIDOS.forEach((d) => inDestino.insertAdjacentHTML("beforeend", `<option value="${d}">${d}</option>`));
+
+formSolicitud.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  msgSolicitud.className = "form-msg";
+  msgSolicitud.textContent = "";
+
+  if (!inSolicita.value.trim() || !inDestino.value || !inDireccion.value.trim() || !inFecha.value || !inEmail.value.trim()) {
+    msgSolicitud.textContent = "Completa los campos obligatorios.";
+    msgSolicitud.className = "form-msg error";
+    return;
+  }
+
+  btnSolicitud.disabled = true;
+  msgSolicitud.textContent = "Guardando...";
+
+  const nuevaSolicitud = {
+    id: idUnico(),
+    fecha_solicitud: new Date().toISOString(),
+    fecha_indicada: inFecha.value,
+    solicita: inSolicita.value.trim(),
+    destino: inDestino.value,
+    direccion: inDireccion.value.trim(),
+    contenido_paquete: inContenido.value.trim() || null,
+    email: inEmail.value.trim(),
+  };
+
+  try {
+    const resp = await fetch(`${SUPABASE_URL}/rest/v1/solicitudes_mensajeria`, {
+      method: "POST",
+      headers: { ...restHeaders(), "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify(nuevaSolicitud),
+    });
+    if (!resp.ok) throw new Error(await resp.text());
+
+    await fetch(`${SUPABASE_URL}/rest/v1/confirmacion_pedidos`, {
+      method: "POST",
+      headers: { ...restHeaders(), "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify({
+        fecha_indicada: nuevaSolicitud.fecha_indicada,
+        solicita: nuevaSolicitud.solicita,
+        destino: nuevaSolicitud.destino,
+        direccion: nuevaSolicitud.direccion,
+        contenido_paquete: nuevaSolicitud.contenido_paquete,
+        email_solicitante: nuevaSolicitud.email,
+        confirmacion_realizado: false,
+      }),
+    });
+
+    msgSolicitud.textContent = "Solicitud enviada. Gracias.";
+    msgSolicitud.className = "form-msg ok";
+    formSolicitud.reset();
+    inFecha.value = fechaHoy();
+    inDestino.value = "";
+  } catch (err) {
+    msgSolicitud.textContent = "No se pudo guardar: " + err.message;
+    msgSolicitud.className = "form-msg error";
+  } finally {
+    btnSolicitud.disabled = false;
+  }
+});
+
+// ---------------- confirmar pedidos (detras de PIN) ----------------
+const pinGate = document.getElementById("pin-gate");
+const pinInput = document.getElementById("pin-input");
+const btnPin = document.getElementById("btn-pin");
+const msgPin = document.getElementById("msg-pin");
+const confirmarContenido = document.getElementById("confirmar-contenido");
+let pinActual = null;
+let confirmacionesCache = [];
+
+async function mensajeriaRpc(nombre, body) {
+  const resp = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${nombre}`, {
+    method: "POST",
+    headers: { ...restHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const texto = await resp.text();
+  if (!resp.ok) {
+    let detalle = "";
+    try { detalle = JSON.parse(texto).message || ""; } catch {}
+    throw new Error(detalle || "PIN incorrecto o sin acceso.");
+  }
+  return texto ? JSON.parse(texto) : null;
+}
+
+async function cargarConfirmaciones(pin) {
+  confirmacionesCache = await mensajeriaRpc("mensajeria_listar_pedidos", { p_pin: pin });
+  pintarConfirmaciones();
+}
+
+async function intentarEntrarConPin(pin) {
+  msgPin.textContent = "";
+  btnPin.disabled = true;
+  try {
+    await cargarConfirmaciones(pin);
+    pinActual = pin;
+    try { sessionStorage.setItem(PIN_STORAGE_KEY, pin); } catch {}
+    pinGate.hidden = true;
+    confirmarContenido.hidden = false;
+  } catch (err) {
+    msgPin.textContent = "PIN incorrecto.";
+    try { sessionStorage.removeItem(PIN_STORAGE_KEY); } catch {}
+  } finally {
+    btnPin.disabled = false;
+  }
+}
+
+function intentarEntrarConPinGuardado() {
+  if (pinActual) return;
+  let guardado = null;
+  try { guardado = sessionStorage.getItem(PIN_STORAGE_KEY); } catch {}
+  if (guardado) intentarEntrarConPin(guardado);
+}
+
+btnPin.addEventListener("click", () => {
+  if (pinInput.value.trim()) intentarEntrarConPin(pinInput.value.trim());
+});
+pinInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") btnPin.click();
+});
+
+document.getElementById("btn-salir-pin").addEventListener("click", () => {
+  pinActual = null;
+  pinInput.value = "";
+  try { sessionStorage.removeItem(PIN_STORAGE_KEY); } catch {}
+  confirmarContenido.hidden = true;
+  pinGate.hidden = false;
+});
+
+function pintarConfirmaciones() {
+  const q = document.getElementById("lc-buscar").value.trim().toLowerCase();
+  const estado = document.getElementById("lc-estado").value;
+  const contenedor = document.getElementById("lc-cards");
+
+  const filtradas = confirmacionesCache.filter((f) => {
+    if (q && !(`${f.solicita} ${f.destino}`.toLowerCase().includes(q))) return false;
+    if (estado === "pendiente" && f.confirmacion_realizado) return false;
+    if (estado === "realizado" && !f.confirmacion_realizado) return false;
+    return true;
+  });
+
+  document.getElementById("lc-count").textContent = `${filtradas.length} resultado(s)`;
+  contenedor.innerHTML = filtradas.length === 0
+    ? `<div class="empty-state">Sin pedidos para estos filtros.</div>`
+    : filtradas.map((f) => `
+        <div class="pedido-card">
+          <div class="pedido-top">
+            <span class="pedido-fecha">${fmtFecha(f.fecha_indicada)}</span>
+            <span class="estado-pill ${f.confirmacion_realizado ? "realizado" : "pendiente"}">${f.confirmacion_realizado ? "Realizado" : "Pendiente"}</span>
+          </div>
+          <h3 class="pedido-solicita">${escHtml(f.solicita)}</h3>
+          <div class="pedido-datos">
+            <div class="pedido-dato"><span class="dato-label">Destino</span><span class="dato-valor">${escHtml(f.destino) || "—"}</span></div>
+            <div class="pedido-dato"><span class="dato-label">Dirección</span><span class="dato-valor">${escHtml(f.direccion) || "—"}</span></div>
+            <div class="pedido-dato"><span class="dato-label">Contenido</span><span class="dato-valor">${escHtml(f.contenido_paquete) || "—"}</span></div>
+            <div class="pedido-dato"><span class="dato-label">Correo</span><span class="dato-valor">${escHtml(f.email_solicitante) || "—"}</span></div>
+          </div>
+          <div class="pedido-obs">
+            <label for="obs-${f.id}">Observaciones</label>
+            <input type="text" id="obs-${f.id}" class="obs-input" data-id="${f.id}" value="${escHtml(f.observaciones)}" placeholder="Sin observaciones">
+            <span class="obs-guardado" data-guardado-id="${f.id}" hidden>Guardado</span>
+          </div>
+          <div class="pedido-footer">
+            <label class="pedido-confirmar">
+              <input type="checkbox" class="chk-confirmar" data-id="${f.id}" ${f.confirmacion_realizado ? "checked" : ""}>
+              Marcar como realizado
+            </label>
+          </div>
+        </div>`).join("");
+
+  contenedor.querySelectorAll(".chk-confirmar").forEach((chk) => {
+    chk.addEventListener("change", async () => {
+      const id = chk.dataset.id;
+      chk.disabled = true;
+      try {
+        await mensajeriaRpc("mensajeria_confirmar_pedido", { p_pin: pinActual, p_id: Number(id), p_confirmado: chk.checked });
+        const fila = confirmacionesCache.find((f) => String(f.id) === String(id));
+        if (fila) fila.confirmacion_realizado = chk.checked;
+        pintarConfirmaciones();
+      } catch (err) {
+        alert("No se pudo actualizar: " + err.message);
+        chk.checked = !chk.checked;
+        chk.disabled = false;
+      }
+    });
+  });
+
+  contenedor.querySelectorAll(".obs-input").forEach((inp) => {
+    const valorOriginal = inp.value;
+    inp.addEventListener("blur", async () => {
+      if (inp.value === valorOriginal) return;
+      const id = inp.dataset.id;
+      inp.disabled = true;
+      try {
+        await mensajeriaRpc("mensajeria_guardar_observaciones", { p_pin: pinActual, p_id: Number(id), p_observaciones: inp.value.trim() || null });
+        const fila = confirmacionesCache.find((f) => String(f.id) === String(id));
+        if (fila) fila.observaciones = inp.value.trim() || null;
+        const aviso = contenedor.querySelector(`.obs-guardado[data-guardado-id="${id}"]`);
+        if (aviso) { aviso.hidden = false; setTimeout(() => { aviso.hidden = true; }, 2000); }
+      } catch (err) {
+        alert("No se pudo guardar la observación: " + err.message);
+        inp.value = valorOriginal;
+      } finally {
+        inp.disabled = false;
+      }
+    });
+  });
+}
+
+document.getElementById("lc-buscar").addEventListener("input", pintarConfirmaciones);
+document.getElementById("lc-estado").addEventListener("change", pintarConfirmaciones);
+document.getElementById("lc-limpiar").addEventListener("click", () => {
+  document.getElementById("lc-buscar").value = "";
+  document.getElementById("lc-estado").value = "pendiente";
+  pintarConfirmaciones();
+});
+</script>
+</body>
+</html>

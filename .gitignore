@@ -1,0 +1,4 @@
+# Contienen el PIN real de "Confirmar Pedidos" en texto plano -- nunca subir
+# a un repositorio publico. Se quedan solo en este equipo.
+permisos_mensajeria.sql
+agregar_campos_mensajeria.sql
