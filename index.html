@@ -13,7 +13,7 @@
     --paper: #f6f5f0; --surface: #ffffff; --ink: #1d2420; --ink-soft: #57625b; --ink-faint: #8a9089;
     --line: #dbdfd4; --line-strong: #c4cabb; --accent: #2e6b4e; --accent-ink: #ffffff;
     --accent-soft: #e3eee6; --accent-soft-line: #c3ddca; --warn: #b3742f; --warn-soft: #f6e9d7;
-    --critical: #a23d3d; --critical-soft: #f6e0e0;
+    --critical: #a23d3d; --critical-soft: #f6e0e0; --info: #3d6b96; --info-soft: #e2ecf3;
     --shadow: 0 1px 2px rgba(29, 36, 32, 0.06), 0 4px 16px rgba(29, 36, 32, 0.05);
     --radius: 10px;
   }
@@ -22,7 +22,7 @@
       --paper: #14180f; --surface: #1b211a; --ink: #eaf0e6; --ink-soft: #a8b3a3; --ink-faint: #6c766a;
       --line: #2c332a; --line-strong: #3b453a; --accent: #6fbf8f; --accent-ink: #0d1a10;
       --accent-soft: #223229; --accent-soft-line: #35503d; --warn: #e0a75c; --warn-soft: #3a2f1a;
-      --critical: #e08080; --critical-soft: #3a2020;
+      --critical: #e08080; --critical-soft: #3a2020; --info: #7fb0dd; --info-soft: #1c2c38;
       --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 4px 20px rgba(0,0,0,0.35);
     }
   }
@@ -102,12 +102,18 @@
   .dato-valor { color: var(--ink); word-break: break-word; }
   .pedido-obs label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-soft); font-weight: 600; display: block; margin-bottom: 4px; }
   .pedido-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 8px; border-top: 1px solid var(--line); }
-  .pedido-confirmar { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--ink-soft); cursor: pointer; }
+  .pedido-footer label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-soft); font-weight: 600; }
+  .estado-select {
+    font: inherit; font-size: 12.5px; font-weight: 600; padding: 6px 8px; border-radius: 6px;
+    border: 1px solid var(--line-strong); background: var(--paper); color: var(--ink); cursor: pointer;
+  }
+  .estado-select:disabled { opacity: 0.5; cursor: wait; }
 
   .estado-pill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 20px; font-size: 11.5px; font-weight: 600; white-space: nowrap; }
   .estado-pill.pendiente { background: var(--warn-soft); color: var(--warn); }
   .estado-pill.realizado { background: var(--accent-soft); color: var(--accent); }
-  .chk-confirmar { width: 17px; height: 17px; accent-color: var(--accent); cursor: pointer; }
+  .estado-pill.cancelado { background: var(--critical-soft); color: var(--critical); }
+  .estado-pill.pospuesta { background: var(--info-soft); color: var(--info); }
   .obs-row { display: flex; align-items: center; gap: 6px; }
   .obs-input {
     font: inherit; font-size: 12.5px; padding: 6px 8px; border: 1px solid var(--line-strong); border-radius: 6px;
@@ -228,9 +234,19 @@
           <label for="lc-estado">Estado</label>
           <select id="lc-estado">
             <option value="todas">Todas</option>
-            <option value="pendiente" selected>Pendientes</option>
+            <option value="pendiente" selected>Pendiente</option>
             <option value="realizado">Realizado</option>
+            <option value="cancelado">Cancelado</option>
+            <option value="pospuesta">Pospuesta</option>
           </select>
+        </div>
+        <div class="field">
+          <label for="lc-desde">Desde</label>
+          <input type="date" id="lc-desde">
+        </div>
+        <div class="field">
+          <label for="lc-hasta">Hasta</label>
+          <input type="date" id="lc-hasta">
         </div>
         <button class="clear-btn" id="lc-limpiar">Limpiar filtros</button>
         <span class="result-count" id="lc-count"></span>
@@ -340,7 +356,7 @@ formSolicitud.addEventListener("submit", async (e) => {
         direccion: nuevaSolicitud.direccion,
         contenido_paquete: nuevaSolicitud.contenido_paquete,
         email_solicitante: nuevaSolicitud.email,
-        confirmacion_realizado: false,
+        estado: "pendiente",
       }),
     });
 
@@ -392,11 +408,13 @@ function tieneObservacion(f) {
 }
 
 function actualizarStats() {
-  const realizados = confirmacionesCache.filter((f) => f.confirmacion_realizado).length;
-  const pendientes = confirmacionesCache.length - realizados;
+  const pendientes = confirmacionesCache.filter((f) => f.estado === "pendiente").length;
+  const realizados = confirmacionesCache.filter((f) => f.estado === "realizado").length;
   document.getElementById("stat-pendientes").textContent = pendientes;
   document.getElementById("stat-realizados").textContent = realizados;
 }
+
+const ESTADO_ETIQUETA = { pendiente: "Pendiente", realizado: "Realizado", cancelado: "Cancelado", pospuesta: "Pospuesta" };
 
 async function intentarEntrarConPin(pin) {
   msgPin.textContent = "";
@@ -440,12 +458,16 @@ document.getElementById("btn-salir-pin").addEventListener("click", () => {
 function pintarConfirmaciones() {
   const q = document.getElementById("lc-buscar").value.trim().toLowerCase();
   const estado = document.getElementById("lc-estado").value;
+  const desde = document.getElementById("lc-desde").value;
+  const hasta = document.getElementById("lc-hasta").value;
   const contenedor = document.getElementById("lc-cards");
 
   const filtradas = confirmacionesCache.filter((f) => {
     if (q && !(`${f.solicita} ${f.destino}`.toLowerCase().includes(q))) return false;
-    if (estado === "pendiente" && f.confirmacion_realizado) return false;
-    if (estado === "realizado" && !f.confirmacion_realizado) return false;
+    if (estado !== "todas" && f.estado !== estado) return false;
+    const fi = (f.fecha_indicada || "").slice(0, 10);
+    if (desde && fi < desde) return false;
+    if (hasta && fi > hasta) return false;
     return true;
   });
 
@@ -456,7 +478,7 @@ function pintarConfirmaciones() {
         <div class="pedido-card">
           <div class="pedido-top">
             <span class="pedido-fecha">${fmtFecha(f.fecha_indicada)}</span>
-            <span class="estado-pill ${f.confirmacion_realizado ? "realizado" : "pendiente"}">${f.confirmacion_realizado ? "Realizado" : "Pendiente"}</span>
+            <span class="estado-pill ${f.estado}">${ESTADO_ETIQUETA[f.estado] || f.estado}</span>
           </div>
           <h3 class="pedido-solicita">${escHtml(f.solicita)}</h3>
           <div class="pedido-datos">
@@ -475,27 +497,32 @@ function pintarConfirmaciones() {
             <span class="obs-guardado" data-guardado-id="${f.id}" hidden>Guardado</span>
           </div>
           <div class="pedido-footer">
-            <label class="pedido-confirmar">
-              <input type="checkbox" class="chk-confirmar" data-id="${f.id}" ${f.confirmacion_realizado ? "checked" : ""}>
-              Marcar como realizado
-            </label>
+            <label for="estado-${f.id}">Estado</label>
+            <select class="estado-select" id="estado-${f.id}" data-id="${f.id}">
+              <option value="pendiente" ${f.estado === "pendiente" ? "selected" : ""}>Pendiente</option>
+              <option value="realizado" ${f.estado === "realizado" ? "selected" : ""}>Realizado</option>
+              <option value="cancelado" ${f.estado === "cancelado" ? "selected" : ""}>Cancelado</option>
+              <option value="pospuesta" ${f.estado === "pospuesta" ? "selected" : ""}>Pospuesta</option>
+            </select>
           </div>
         </div>`).join("");
 
-  contenedor.querySelectorAll(".chk-confirmar").forEach((chk) => {
-    chk.addEventListener("change", async () => {
-      const id = chk.dataset.id;
-      chk.disabled = true;
+  contenedor.querySelectorAll(".estado-select").forEach((sel) => {
+    const valorOriginal = sel.value;
+    sel.addEventListener("change", async () => {
+      const id = sel.dataset.id;
+      const nuevoEstado = sel.value;
+      sel.disabled = true;
       try {
-        await mensajeriaRpc("mensajeria_confirmar_pedido", { p_pin: pinActual, p_id: Number(id), p_confirmado: chk.checked });
+        await mensajeriaRpc("mensajeria_actualizar_estado", { p_pin: pinActual, p_id: Number(id), p_estado: nuevoEstado });
         const fila = confirmacionesCache.find((f) => String(f.id) === String(id));
-        if (fila) fila.confirmacion_realizado = chk.checked;
+        if (fila) fila.estado = nuevoEstado;
         actualizarStats();
         pintarConfirmaciones();
       } catch (err) {
         alert("No se pudo actualizar: " + err.message);
-        chk.checked = !chk.checked;
-        chk.disabled = false;
+        sel.value = valorOriginal;
+        sel.disabled = false;
       }
     });
   });
@@ -548,11 +575,15 @@ function pintarConfirmaciones() {
   });
 }
 
-document.getElementById("lc-buscar").addEventListener("input", pintarConfirmaciones);
+["lc-buscar", "lc-desde", "lc-hasta"].forEach((id) => {
+  document.getElementById(id).addEventListener("input", pintarConfirmaciones);
+});
 document.getElementById("lc-estado").addEventListener("change", pintarConfirmaciones);
 document.getElementById("lc-limpiar").addEventListener("click", () => {
   document.getElementById("lc-buscar").value = "";
   document.getElementById("lc-estado").value = "pendiente";
+  document.getElementById("lc-desde").value = "";
+  document.getElementById("lc-hasta").value = "";
   pintarConfirmaciones();
 });
 </script>
