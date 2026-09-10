@@ -108,14 +108,33 @@
   .estado-pill.pendiente { background: var(--warn-soft); color: var(--warn); }
   .estado-pill.realizado { background: var(--accent-soft); color: var(--accent); }
   .chk-confirmar { width: 17px; height: 17px; accent-color: var(--accent); cursor: pointer; }
+  .obs-row { display: flex; align-items: center; gap: 6px; }
   .obs-input {
     font: inherit; font-size: 12.5px; padding: 6px 8px; border: 1px solid var(--line-strong); border-radius: 6px;
-    background: var(--paper); color: var(--ink); width: 100%;
+    background: var(--paper); color: var(--ink); width: 100%; flex: 1; min-width: 0;
   }
   .obs-input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .obs-input[readonly] { background: var(--accent-soft); color: var(--ink-soft); border-color: var(--accent-soft-line); cursor: default; }
+  .obs-btn {
+    flex-shrink: 0; font: inherit; font-size: 11px; font-weight: 600; padding: 6px 10px; border-radius: 6px;
+    border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink-soft); cursor: pointer; white-space: nowrap;
+  }
+  .obs-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .obs-btn.obs-guardar { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  .obs-btn.obs-guardar:hover { opacity: 0.9; }
+  .obs-btn:disabled { opacity: 0.5; cursor: wait; }
   .obs-guardado { font-size: 10.5px; color: var(--accent); }
 
   .top-bar { display: flex; justify-content: flex-end; }
+
+  .stats-row { display: flex; flex-wrap: wrap; gap: 12px; }
+  .stat-tile { flex: 1; min-width: 150px; border-radius: var(--radius); padding: 14px 16px; display: flex; flex-direction: column; gap: 2px; }
+  .stat-numero { font-family: "Fraunces", Georgia, serif; font-size: 28px; font-weight: 700; line-height: 1.1; }
+  .stat-etiqueta { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+  .stat-tile.stat-pendiente { background: var(--warn-soft); }
+  .stat-tile.stat-pendiente .stat-numero, .stat-tile.stat-pendiente .stat-etiqueta { color: var(--warn); }
+  .stat-tile.stat-realizado { background: var(--accent-soft); }
+  .stat-tile.stat-realizado .stat-numero, .stat-tile.stat-realizado .stat-etiqueta { color: var(--accent); }
 
   footer { font-size: 12px; color: var(--ink-faint); text-align: center; }
 </style>
@@ -188,6 +207,17 @@
       </div>
       <h2>Confirmar Pedidos</h2>
       <p class="card-hint">Marca cada pedido cuando ya haya sido entregado o gestionado.</p>
+
+      <div class="stats-row">
+        <div class="stat-tile stat-pendiente">
+          <span class="stat-numero" id="stat-pendientes">0</span>
+          <span class="stat-etiqueta">Pedidos pendientes</span>
+        </div>
+        <div class="stat-tile stat-realizado">
+          <span class="stat-numero" id="stat-realizados">0</span>
+          <span class="stat-etiqueta">Pedidos realizados</span>
+        </div>
+      </div>
 
       <div class="filters">
         <div class="field">
@@ -353,7 +383,19 @@ async function mensajeriaRpc(nombre, body) {
 
 async function cargarConfirmaciones(pin) {
   confirmacionesCache = await mensajeriaRpc("mensajeria_listar_pedidos", { p_pin: pin });
+  actualizarStats();
   pintarConfirmaciones();
+}
+
+function tieneObservacion(f) {
+  return !!(f.observaciones && f.observaciones.trim() !== "");
+}
+
+function actualizarStats() {
+  const realizados = confirmacionesCache.filter((f) => f.confirmacion_realizado).length;
+  const pendientes = confirmacionesCache.length - realizados;
+  document.getElementById("stat-pendientes").textContent = pendientes;
+  document.getElementById("stat-realizados").textContent = realizados;
 }
 
 async function intentarEntrarConPin(pin) {
@@ -425,7 +467,11 @@ function pintarConfirmaciones() {
           </div>
           <div class="pedido-obs">
             <label for="obs-${f.id}">Observaciones</label>
-            <input type="text" id="obs-${f.id}" class="obs-input" data-id="${f.id}" value="${escHtml(f.observaciones)}" placeholder="Sin observaciones">
+            <div class="obs-row">
+              <input type="text" id="obs-${f.id}" class="obs-input" data-id="${f.id}" value="${escHtml(f.observaciones)}" placeholder="Sin observaciones" ${tieneObservacion(f) ? "readonly" : ""}>
+              <button type="button" class="obs-btn obs-editar" data-id="${f.id}" ${tieneObservacion(f) ? "" : "hidden"}>Editar</button>
+              <button type="button" class="obs-btn obs-guardar" data-id="${f.id}" ${tieneObservacion(f) ? "hidden" : ""}>Guardar</button>
+            </div>
             <span class="obs-guardado" data-guardado-id="${f.id}" hidden>Guardado</span>
           </div>
           <div class="pedido-footer">
@@ -444,6 +490,7 @@ function pintarConfirmaciones() {
         await mensajeriaRpc("mensajeria_confirmar_pedido", { p_pin: pinActual, p_id: Number(id), p_confirmado: chk.checked });
         const fila = confirmacionesCache.find((f) => String(f.id) === String(id));
         if (fila) fila.confirmacion_realizado = chk.checked;
+        actualizarStats();
         pintarConfirmaciones();
       } catch (err) {
         alert("No se pudo actualizar: " + err.message);
@@ -453,23 +500,49 @@ function pintarConfirmaciones() {
     });
   });
 
-  contenedor.querySelectorAll(".obs-input").forEach((inp) => {
-    const valorOriginal = inp.value;
-    inp.addEventListener("blur", async () => {
-      if (inp.value === valorOriginal) return;
-      const id = inp.dataset.id;
+  // Observaciones: si ya tiene texto guardado queda bloqueada (solo lectura)
+  // para que no se edite sin querer; el boton "Editar" la habilita, y
+  // mientras esta habilitada aparece "Guardar" en vez de guardar solo al
+  // salir del campo, que no era obvio que hacia algo.
+  contenedor.querySelectorAll(".obs-editar").forEach((btnEditar) => {
+    btnEditar.addEventListener("click", () => {
+      const id = btnEditar.dataset.id;
+      const inp = contenedor.querySelector(`.obs-input[data-id="${id}"]`);
+      const btnGuardar = contenedor.querySelector(`.obs-guardar[data-id="${id}"]`);
+      inp.readOnly = false;
+      inp.focus();
+      inp.select();
+      btnEditar.hidden = true;
+      btnGuardar.hidden = false;
+    });
+  });
+
+  contenedor.querySelectorAll(".obs-guardar").forEach((btnGuardar) => {
+    btnGuardar.addEventListener("click", async () => {
+      const id = btnGuardar.dataset.id;
+      const inp = contenedor.querySelector(`.obs-input[data-id="${id}"]`);
+      const btnEditar = contenedor.querySelector(`.obs-editar[data-id="${id}"]`);
+      const valorNuevo = inp.value.trim();
       inp.disabled = true;
+      btnGuardar.disabled = true;
       try {
-        await mensajeriaRpc("mensajeria_guardar_observaciones", { p_pin: pinActual, p_id: Number(id), p_observaciones: inp.value.trim() || null });
+        await mensajeriaRpc("mensajeria_guardar_observaciones", { p_pin: pinActual, p_id: Number(id), p_observaciones: valorNuevo || null });
         const fila = confirmacionesCache.find((f) => String(f.id) === String(id));
-        if (fila) fila.observaciones = inp.value.trim() || null;
+        if (fila) fila.observaciones = valorNuevo || null;
+        inp.disabled = false;
+        if (valorNuevo) {
+          inp.readOnly = true;
+          btnGuardar.hidden = true;
+          btnEditar.hidden = false;
+        } else {
+          btnGuardar.disabled = false;
+        }
         const aviso = contenedor.querySelector(`.obs-guardado[data-guardado-id="${id}"]`);
         if (aviso) { aviso.hidden = false; setTimeout(() => { aviso.hidden = true; }, 2000); }
       } catch (err) {
         alert("No se pudo guardar la observación: " + err.message);
-        inp.value = valorOriginal;
-      } finally {
         inp.disabled = false;
+        btnGuardar.disabled = false;
       }
     });
   });
