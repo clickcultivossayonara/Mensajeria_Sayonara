@@ -143,6 +143,25 @@
   .stat-tile.stat-realizado .stat-numero, .stat-tile.stat-realizado .stat-etiqueta { color: var(--accent); }
 
   footer { font-size: 12px; color: var(--ink-faint); text-align: center; }
+
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(29, 36, 32, 0.55);
+    display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 200;
+  }
+  .modal-overlay[hidden] { display: none; }
+  .modal-box {
+    background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow);
+    padding: 32px 28px; max-width: 360px; width: 100%; text-align: center;
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+  }
+  .modal-check {
+    width: 56px; height: 56px; border-radius: 50%; background: var(--accent-soft); color: var(--accent);
+    display: flex; align-items: center; justify-content: center; margin-bottom: 4px;
+  }
+  .modal-check svg { width: 30px; height: 30px; }
+  .modal-box h3 { font-family: "Fraunces", Georgia, serif; font-size: 18px; margin: 0; color: var(--ink); }
+  .modal-box p { font-size: 13.5px; color: var(--ink-soft); margin: 0; line-height: 1.45; }
+  .modal-box .btn-primary { margin-top: 12px; width: 100%; }
 </style>
 </head>
 <body>
@@ -183,7 +202,7 @@
           <input type="date" id="s-fecha" required>
         </div>
         <div class="field">
-          <label for="s-contenido">Contenido del paquete</label>
+          <label for="s-contenido">Contenido o descripción de tu solicitud</label>
           <input type="text" id="s-contenido" placeholder="Ej. Disco duro, documentos…" autocomplete="off">
         </div>
         <div class="field">
@@ -256,6 +275,17 @@
   </section>
 
   <footer>Cultivos Sayonara &middot; datos guardados en vivo en Supabase</footer>
+</div>
+
+<div class="modal-overlay" id="modal-exito" hidden>
+  <div class="modal-box">
+    <div class="modal-check">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+    </div>
+    <h3>Hemos recibido tu solicitud</h3>
+    <p>Te enviaremos los avances de mensajería al correo que proporcionaste</p>
+    <button type="button" class="btn-primary" id="btn-cerrar-modal">Aceptar</button>
+  </div>
 </div>
 
 <script>
@@ -360,11 +390,12 @@ formSolicitud.addEventListener("submit", async (e) => {
       }),
     });
 
-    msgSolicitud.textContent = "Solicitud enviada. Gracias.";
-    msgSolicitud.className = "form-msg ok";
     formSolicitud.reset();
     inFecha.value = fechaHoy();
     inDestino.value = "";
+    msgSolicitud.textContent = "";
+    msgSolicitud.className = "form-msg";
+    document.getElementById("modal-exito").hidden = false;
   } catch (err) {
     msgSolicitud.textContent = "No se pudo guardar: " + err.message;
     msgSolicitud.className = "form-msg error";
@@ -372,6 +403,11 @@ formSolicitud.addEventListener("submit", async (e) => {
     btnSolicitud.disabled = false;
   }
 });
+
+const modalExito = document.getElementById("modal-exito");
+document.getElementById("btn-cerrar-modal").addEventListener("click", () => { modalExito.hidden = true; });
+modalExito.addEventListener("click", (e) => { if (e.target === modalExito) modalExito.hidden = true; });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !modalExito.hidden) modalExito.hidden = true; });
 
 // ---------------- confirmar pedidos (detras de PIN) ----------------
 const pinGate = document.getElementById("pin-gate");
