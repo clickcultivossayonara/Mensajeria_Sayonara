@@ -2,3 +2,4 @@
 # a un repositorio publico. Se quedan solo en este equipo.
 permisos_mensajeria.sql
 agregar_campos_mensajeria.sql
+agregar_notificaciones_correo.sql
