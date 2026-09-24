@@ -87,10 +87,15 @@ const transporter = nodemailer.createTransport({
   auth: { user: SMTP_USER, pass: SMTP_PASSWORD },
 });
 
-async function enviarCorreo(destinatario: string, asunto: string, html: string): Promise<void> {
+// Cada solicitud nueva tambien le llega a este buzon interno, en copia
+// oculta para que el solicitante no vea la direccion.
+const COPIA_INTERNA_NUEVAS = "sayonaramensajeria@gmail.com";
+
+async function enviarCorreo(destinatario: string, asunto: string, html: string, copiaOculta?: string): Promise<void> {
   await transporter.sendMail({
     from: `"Mensajería Sayonara" <${SMTP_USER}>`,
     to: destinatario,
+    bcc: copiaOculta,
     subject: asunto,
     html,
   });
@@ -107,7 +112,7 @@ async function enviarNuevaSolicitud(r: Record<string, any>): Promise<void> {
     ["Contenido paquete", r.contenido_paquete],
     ["Email", r.email],
   ]);
-  await enviarCorreo(r.email, "Solicitud de mensajería recibida", html);
+  await enviarCorreo(r.email, "Solicitud de mensajería recibida", html, COPIA_INTERNA_NUEVAS);
 }
 
 async function enviarActualizacion(r: Record<string, any>, actualizadoEn: string | null | undefined): Promise<void> {
@@ -121,6 +126,9 @@ async function enviarActualizacion(r: Record<string, any>, actualizadoEn: string
     ["Dirección", r.direccion],
     ["Contenido paquete", r.contenido_paquete],
     ["Estado", etiqueta],
+    ...(r.estado === "pospuesta" && r.fecha_pospuesta
+      ? [["Pospuesta para", fmtFecha(r.fecha_pospuesta)] as [string, string]]
+      : []),
     ["Observaciones", r.observaciones],
   ]);
   await enviarCorreo(r.email_solicitante, `Tu solicitud de mensajería está: ${etiqueta}`, html);
@@ -144,7 +152,8 @@ Deno.serve(async (req) => {
     } else if (payload.table === "confirmacion_pedidos" && payload.type === "UPDATE") {
       const cambioEstado = payload.record?.estado !== payload.old_record?.estado;
       const cambioObs = payload.record?.observaciones !== payload.old_record?.observaciones;
-      if (cambioEstado || cambioObs) {
+      const cambioFecha = payload.record?.fecha_pospuesta !== payload.old_record?.fecha_pospuesta;
+      if (cambioEstado || cambioObs || cambioFecha) {
         await enviarActualizacion(payload.record, payload.updated_at);
       }
     }
