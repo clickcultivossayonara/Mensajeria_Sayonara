@@ -148,7 +148,15 @@
   .top-bar { display: flex; justify-content: flex-end; }
 
   .stats-row { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
-  .stat-tile { flex: 1; min-width: 150px; border-radius: var(--radius); padding: 14px 16px; display: flex; flex-direction: column; gap: 2px; }
+  .stat-tile {
+    flex: 1; min-width: 150px; border-radius: var(--radius); padding: 14px 16px; display: flex; flex-direction: column; gap: 2px;
+    font: inherit; text-align: left; cursor: pointer; border: 2px solid transparent;
+    transition: border-color 0.12s ease, box-shadow 0.12s ease;
+  }
+  .stat-tile:hover { box-shadow: var(--shadow); }
+  .stat-tile:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+  .stat-tile.stat-pendiente.activo { border-color: var(--warn); }
+  .stat-tile.stat-realizado.activo { border-color: var(--accent); }
   .stat-numero { font-family: "Fraunces", Georgia, serif; font-size: 28px; font-weight: 700; line-height: 1.1; }
   .stat-etiqueta { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
   .stat-tile.stat-pendiente { background: var(--warn-soft); }
@@ -250,14 +258,14 @@
       <p class="card-hint">Marca cada pedido cuando ya haya sido entregado o gestionado.</p>
 
       <div class="stats-row">
-        <div class="stat-tile stat-pendiente">
+        <button type="button" class="stat-tile stat-pendiente" data-estado="pendiente" aria-pressed="false" title="Clic para filtrar los pedidos pendientes">
           <span class="stat-numero" id="stat-pendientes">0</span>
           <span class="stat-etiqueta">Pedidos pendientes</span>
-        </div>
-        <div class="stat-tile stat-realizado">
+        </button>
+        <button type="button" class="stat-tile stat-realizado" data-estado="realizado" aria-pressed="false" title="Clic para filtrar los pedidos realizados">
           <span class="stat-numero" id="stat-realizados">0</span>
           <span class="stat-etiqueta">Pedidos realizados</span>
-        </div>
+        </button>
       </div>
 
       <div class="filters">
@@ -273,6 +281,12 @@
             <option value="realizado">Realizado</option>
             <option value="cancelado">Cancelado</option>
             <option value="pospuesta">Pospuesta</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="lc-destino">Destino</label>
+          <select id="lc-destino">
+            <option value="">Todos</option>
           </select>
         </div>
         <div class="field">
@@ -565,7 +579,31 @@ async function mensajeriaRpc(nombre, body) {
 async function cargarConfirmaciones(pin) {
   confirmacionesCache = await mensajeriaRpc("mensajeria_listar_pedidos", { p_pin: pin });
   actualizarStats();
+  actualizarFiltroDestinos();
   pintarConfirmaciones();
+}
+
+// El filtro de destino solo ofrece los municipios que tienen pedidos, no los
+// 125 del formulario, para que cada opcion de la lista devuelva resultados.
+function actualizarFiltroDestinos() {
+  const sel = document.getElementById("lc-destino");
+  const actual = sel.value;
+  const destinos = [...new Set(confirmacionesCache.map((f) => f.destino).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b, "es"));
+  sel.innerHTML = `<option value="">Todos</option>` +
+    destinos.map((d) => `<option value="${escHtml(d)}">${escHtml(d)}</option>`).join("");
+  sel.value = destinos.includes(actual) ? actual : "";
+}
+
+// Las tarjetas de conteo marcan el filtro de estado activo y funcionan como
+// atajo: clic en una filtra por ese estado, otro clic vuelve a mostrar todas.
+function sincronizarTarjetasEstado() {
+  const estado = document.getElementById("lc-estado").value;
+  document.querySelectorAll(".stat-tile").forEach((t) => {
+    const activa = t.dataset.estado === estado;
+    t.classList.toggle("activo", activa);
+    t.setAttribute("aria-pressed", activa ? "true" : "false");
+  });
 }
 
 function tieneObservacion(f) {
@@ -629,13 +667,16 @@ document.getElementById("btn-salir-pin").addEventListener("click", () => {
 function pintarConfirmaciones() {
   const q = document.getElementById("lc-buscar").value.trim().toLowerCase();
   const estado = document.getElementById("lc-estado").value;
+  const destino = document.getElementById("lc-destino").value;
   const desde = document.getElementById("lc-desde").value;
   const hasta = document.getElementById("lc-hasta").value;
   const contenedor = document.getElementById("lc-cards");
+  sincronizarTarjetasEstado();
 
   const filtradas = confirmacionesCache.filter((f) => {
     if (q && !(`${f.solicita} ${f.destino}`.toLowerCase().includes(q))) return false;
     if (estado !== "todas" && f.estado !== estado) return false;
+    if (destino && f.destino !== destino) return false;
     const fi = (f.fecha_indicada || "").slice(0, 10);
     if (desde && fi < desde) return false;
     if (hasta && fi > hasta) return false;
@@ -789,9 +830,18 @@ function pintarConfirmaciones() {
   document.getElementById(id).addEventListener("input", pintarConfirmaciones);
 });
 document.getElementById("lc-estado").addEventListener("change", pintarConfirmaciones);
+document.getElementById("lc-destino").addEventListener("change", pintarConfirmaciones);
+document.querySelectorAll(".stat-tile").forEach((tile) => {
+  tile.addEventListener("click", () => {
+    const selEstado = document.getElementById("lc-estado");
+    selEstado.value = selEstado.value === tile.dataset.estado ? "todas" : tile.dataset.estado;
+    pintarConfirmaciones();
+  });
+});
 document.getElementById("lc-limpiar").addEventListener("click", () => {
   document.getElementById("lc-buscar").value = "";
   document.getElementById("lc-estado").value = "pendiente";
+  document.getElementById("lc-destino").value = "";
   document.getElementById("lc-desde").value = "";
   document.getElementById("lc-hasta").value = "";
   pintarConfirmaciones();
