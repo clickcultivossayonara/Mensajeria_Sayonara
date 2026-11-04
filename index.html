@@ -58,6 +58,18 @@
   }
   .field input:focus, .field select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 
+  .combo { position: relative; }
+  .combo input { width: 100%; }
+  .combo-panel {
+    position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 50;
+    max-height: 240px; overflow-y: auto; background: var(--surface); border: 1px solid var(--line-strong);
+    border-radius: 8px; box-shadow: var(--shadow); padding: 4px;
+  }
+  .combo-panel[hidden] { display: none; }
+  .combo-option { padding: 8px 10px; border-radius: 5px; cursor: pointer; font-size: 14px; }
+  .combo-option:hover, .combo-option.activa { background: var(--accent-soft); color: var(--accent); }
+  .combo-vacio { padding: 10px; font-size: 13px; color: var(--ink-soft); }
+
   .form-actions { display: flex; align-items: center; gap: 14px; margin-top: 18px; }
   .btn-primary {
     font: inherit; font-size: 14px; font-weight: 600; padding: 10px 22px; border-radius: 7px; border: none;
@@ -191,9 +203,11 @@
         </div>
         <div class="field">
           <label for="s-destino">Destino <span class="req">*</span></label>
-          <select id="s-destino" required>
-            <option value="">Selecciona un destino…</option>
-          </select>
+          <div class="combo">
+            <input type="text" id="s-destino" placeholder="Escribe para buscar un municipio…" required autocomplete="off"
+                   role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="destino-panel">
+            <div class="combo-panel" id="destino-panel" role="listbox" hidden></div>
+          </div>
         </div>
         <div class="field">
           <label for="s-direccion">Dirección <span class="req">*</span></label>
@@ -360,14 +374,110 @@ const btnSolicitud = document.getElementById("btn-solicitud");
 const msgSolicitud = document.getElementById("msg-solicitud");
 
 inFecha.value = fechaHoy();
-DESTINOS_CONOCIDOS.forEach((d) => inDestino.insertAdjacentHTML("beforeend", `<option value="${d}">${d}</option>`));
+
+// Destino: campo con sugerencias. Filtra mientras se escribe, ignorando
+// tildes y mayusculas, y solo acepta un municipio de la lista para que
+// todos queden escritos igual.
+const normalizar = (s) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
+const DESTINOS_NORMALIZADOS = DESTINOS_CONOCIDOS.map(normalizar);
+const destinoPanel = document.getElementById("destino-panel");
+let destinoOpciones = [];
+let destinoActivo = -1;
+
+function destinoCoincidencias(texto) {
+  const q = normalizar(texto);
+  if (!q) return DESTINOS_CONOCIDOS.slice();
+  const empiezan = [];
+  const contienen = [];
+  DESTINOS_CONOCIDOS.forEach((d, i) => {
+    if (DESTINOS_NORMALIZADOS[i].startsWith(q)) empiezan.push(d);
+    else if (DESTINOS_NORMALIZADOS[i].includes(q)) contienen.push(d);
+  });
+  return empiezan.concat(contienen);
+}
+
+function marcarDestinoActivo() {
+  destinoPanel.querySelectorAll(".combo-option").forEach((el, i) => el.classList.toggle("activa", i === destinoActivo));
+  const activa = destinoPanel.querySelector(".combo-option.activa");
+  if (activa) {
+    activa.scrollIntoView({ block: "nearest" });
+    inDestino.setAttribute("aria-activedescendant", activa.id);
+  } else {
+    inDestino.removeAttribute("aria-activedescendant");
+  }
+}
+
+function abrirDestinos() {
+  destinoOpciones = destinoCoincidencias(inDestino.value);
+  destinoActivo = inDestino.value.trim() && destinoOpciones.length ? 0 : -1;
+  destinoPanel.innerHTML = destinoOpciones.length === 0
+    ? `<div class="combo-vacio">Sin coincidencias</div>`
+    : destinoOpciones.map((d, i) => `<div class="combo-option" role="option" id="destino-op-${i}" data-valor="${escHtml(d)}">${escHtml(d)}</div>`).join("");
+  destinoPanel.hidden = false;
+  inDestino.setAttribute("aria-expanded", "true");
+  marcarDestinoActivo();
+}
+
+function cerrarDestinos() {
+  destinoPanel.hidden = true;
+  inDestino.setAttribute("aria-expanded", "false");
+  inDestino.removeAttribute("aria-activedescendant");
+}
+
+function canonicalizarDestino() {
+  const i = DESTINOS_NORMALIZADOS.indexOf(normalizar(inDestino.value));
+  if (i >= 0) inDestino.value = DESTINOS_CONOCIDOS[i];
+}
+
+function actualizarValidezDestino() {
+  const hayTexto = inDestino.value.trim() !== "";
+  const esValido = DESTINOS_NORMALIZADOS.includes(normalizar(inDestino.value));
+  inDestino.setCustomValidity(hayTexto && !esValido ? "Elige un municipio de la lista." : "");
+}
+
+function elegirDestino(valor) {
+  inDestino.value = valor;
+  actualizarValidezDestino();
+  cerrarDestinos();
+}
+
+inDestino.addEventListener("focus", abrirDestinos);
+inDestino.addEventListener("input", () => { abrirDestinos(); actualizarValidezDestino(); });
+inDestino.addEventListener("blur", () => { cerrarDestinos(); canonicalizarDestino(); actualizarValidezDestino(); });
+inDestino.addEventListener("keydown", (e) => {
+  if (destinoPanel.hidden) {
+    if (e.key === "ArrowDown") { e.preventDefault(); abrirDestinos(); }
+    return;
+  }
+  if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+    e.preventDefault();
+    if (!destinoOpciones.length) return;
+    const paso = e.key === "ArrowDown" ? 1 : -1;
+    destinoActivo = destinoActivo === -1
+      ? (paso > 0 ? 0 : destinoOpciones.length - 1)
+      : (destinoActivo + paso + destinoOpciones.length) % destinoOpciones.length;
+    marcarDestinoActivo();
+  } else if (e.key === "Enter") {
+    if (destinoActivo >= 0) { e.preventDefault(); elegirDestino(destinoOpciones[destinoActivo]); }
+  } else if (e.key === "Escape") {
+    cerrarDestinos();
+  }
+});
+// mousedown (no click) para elegir antes de que el campo pierda el foco.
+destinoPanel.addEventListener("mousedown", (e) => {
+  const opcion = e.target.closest(".combo-option");
+  if (!opcion) return;
+  e.preventDefault();
+  elegirDestino(opcion.dataset.valor);
+});
 
 formSolicitud.addEventListener("submit", async (e) => {
   e.preventDefault();
   msgSolicitud.className = "form-msg";
   msgSolicitud.textContent = "";
 
-  if (!inSolicita.value.trim() || !inDestino.value || !inDireccion.value.trim() || !inFecha.value || !inEmail.value.trim()) {
+  canonicalizarDestino();
+  if (!inSolicita.value.trim() || !DESTINOS_CONOCIDOS.includes(inDestino.value) || !inDireccion.value.trim() || !inFecha.value || !inEmail.value.trim()) {
     msgSolicitud.textContent = "Completa los campos obligatorios.";
     msgSolicitud.className = "form-msg error";
     return;
