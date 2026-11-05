@@ -222,6 +222,10 @@
           <input type="text" id="s-direccion" placeholder="Ej. Calle 10 # 5-23" required autocomplete="off">
         </div>
         <div class="field">
+          <label for="s-proveedor">Proveedor</label>
+          <input type="text" id="s-proveedor" placeholder="Nombre del proveedor" autocomplete="off">
+        </div>
+        <div class="field">
           <label for="s-fecha">Fecha indicada <span class="req">*</span></label>
           <input type="date" id="s-fecha" required>
         </div>
@@ -380,6 +384,7 @@ tabConfirmar.addEventListener("click", () => {
 const inSolicita = document.getElementById("s-solicita");
 const inDestino = document.getElementById("s-destino");
 const inDireccion = document.getElementById("s-direccion");
+const inProveedor = document.getElementById("s-proveedor");
 const inFecha = document.getElementById("s-fecha");
 const inContenido = document.getElementById("s-contenido");
 const inEmail = document.getElementById("s-email");
@@ -507,6 +512,7 @@ formSolicitud.addEventListener("submit", async (e) => {
     solicita: inSolicita.value.trim(),
     destino: inDestino.value,
     direccion: inDireccion.value.trim(),
+    proveedor: inProveedor.value.trim() || null,
     contenido_paquete: inContenido.value.trim() || null,
     email: inEmail.value.trim(),
   };
@@ -527,6 +533,7 @@ formSolicitud.addEventListener("submit", async (e) => {
         solicita: nuevaSolicitud.solicita,
         destino: nuevaSolicitud.destino,
         direccion: nuevaSolicitud.direccion,
+        proveedor: nuevaSolicitud.proveedor,
         contenido_paquete: nuevaSolicitud.contenido_paquete,
         email_solicitante: nuevaSolicitud.email,
         estado: "pendiente",
@@ -696,6 +703,7 @@ function pintarConfirmaciones() {
           <div class="pedido-datos">
             <div class="pedido-dato"><span class="dato-label">Destino</span><span class="dato-valor">${escHtml(f.destino) || "—"}</span></div>
             <div class="pedido-dato"><span class="dato-label">Dirección</span><span class="dato-valor">${escHtml(f.direccion) || "—"}</span></div>
+            <div class="pedido-dato"><span class="dato-label">Proveedor</span><span class="dato-valor">${escHtml(f.proveedor) || "—"}</span></div>
             <div class="pedido-dato"><span class="dato-label">Contenido</span><span class="dato-valor">${escHtml(f.contenido_paquete) || "—"}</span></div>
             <div class="pedido-dato"><span class="dato-label">Correo</span><span class="dato-valor">${escHtml(f.email_solicitante) || "—"}</span></div>
           </div>

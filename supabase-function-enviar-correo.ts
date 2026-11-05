@@ -109,6 +109,7 @@ async function enviarNuevaSolicitud(r: Record<string, any>): Promise<void> {
     ["Solicita", r.solicita],
     ["Destino", r.destino],
     ["Dirección", r.direccion],
+    ["Proveedor", r.proveedor],
     ["Contenido paquete", r.contenido_paquete],
     ["Email", r.email],
   ]);
@@ -124,6 +125,7 @@ async function enviarActualizacion(r: Record<string, any>, actualizadoEn: string
     ["Solicita", r.solicita],
     ["Destino", r.destino],
     ["Dirección", r.direccion],
+    ["Proveedor", r.proveedor],
     ["Contenido paquete", r.contenido_paquete],
     ["Estado", etiqueta],
     ...(r.estado === "pospuesta" && r.fecha_pospuesta
